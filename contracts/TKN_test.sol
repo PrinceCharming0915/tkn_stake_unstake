@@ -1,3 +1,9 @@
+/**
+ *Submitted for verification at BscScan.com on 2021-12-06
+ */
+
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.0;
 
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
@@ -5,7 +11,6 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/utils/math/SafeMath.sol';
 
 contract TKN_test is Ownable {
-    bool TESTING = true;
     using SafeMath for uint256;
 
     // stakeToken address(TKN)
@@ -15,7 +20,7 @@ contract TKN_test is Ownable {
 
     uint256 public maxStakeableToken;
     uint256 public minStakeableToken;
-    uint256 public totalUnstakedToken;
+    uint256 public totalUnStakedToken;
     uint256 public totalStakedToken;
     uint256 public totalClaimedRewardToken;
     uint256 public totalStakers;
@@ -28,16 +33,16 @@ contract TKN_test is Ownable {
         uint256 stakeTime;
         uint256 amount;
         uint256 reward;
-        uint256 availableUnstakeAmount;
-        uint256 availableUnClaimedReward;
+        uint256 availableUnstakedAmount;
+        uint256 availableUnclaimedReward;
         bool withdrawn;
         bool unstaked;
     }
 
     struct User {
-        uint256 totalStakedToken;
-        uint256 totalUnstakedToken;
-        uint256 totalClaimedRewardToken;
+        uint256 totalStakedTokenUser;
+        uint256 totalUnstakedTokenUser;
+        uint256 totalClaimedRewardTokenUser;
         uint256 stakeCount;
         bool alreadyExists;
     }
@@ -60,7 +65,6 @@ contract TKN_test is Ownable {
 
         if ( !Stakers[msg.sender].alreadyExists ) {
             Stakers[msg.sender].alreadyExists = true;
-            // StakersID.push(msg.sender);
             StakersID[totalStakers] = msg.sender;
             totalStakers ++;
         }
@@ -68,8 +72,8 @@ contract TKN_test is Ownable {
         stakeToken.transferFrom(msg.sender, address(this), _amount);
 
         uint256 index = Stakers[msg.sender].stakeCount;
-        Stakers[msg.sender].totalStakedToken = Stakers[msg.sender]
-            .totalStakedToken
+        Stakers[msg.sender].totalStakedTokenUser = Stakers[msg.sender]
+            .totalStakedTokenUser
             .add(_amount);
 
         totalStakedToken = totalStakedToken.add(_amount);
@@ -78,96 +82,106 @@ contract TKN_test is Ownable {
         stakersRecord[msg.sender][index].unstakeTime = block.timestamp.add(duration);
 
         stakersRecord[msg.sender][index].amount = _amount;
-        stakersRecord[msg.sender][index].reward = getReward(_amount);
+        stakersRecord[msg.sender][index].reward = _amount.div(percentDivider);
 
-        stakersRecord[msg.sender][index].availableUnstakeAmount = _amount;
-        stakersRecord[msg.sender][index].availableUnClaimedReward = getReward(_amount);
+        stakersRecord[msg.sender][index].availableUnstakedAmount = _amount;
+        stakersRecord[msg.sender][index].availableUnclaimedReward = _amount.div(percentDivider);
 
         stakersRecord[msg.sender][index].unstaked = false;
         stakersRecord[msg.sender][index].withdrawn = false;
-
-        Stakers[msg.sender].stakeCount ++;
+            
+        Stakers[msg.sender].stakeCount++;
     }
 
     function unstake( uint256 _amount ) public {
+        require(
+            _amount <= getMaxUnstakeAmount( msg.sender ),
+            "amount must be less than available max unstake amount"
+        );
+
         uint256 sendAmount = _amount;
-        require( _amount <= getMaxUnstakeableAmount(msg.sender), "amount must be less than available max unstake amount" );
-        for ( uint256 _index ; _index < Stakers[msg.sender].stakeCount ; _index++ ) {
-            if ( stakersRecord[msg.sender][_index].unstaked || _amount == 0 ) {
+
+        for (uint256 index; index < Stakers[msg.sender].stakeCount ; index++) {
+            if (stakersRecord[msg.sender][index].unstaked || _amount == 0) {
                 continue;
             }
-            if ( stakersRecord[msg.sender][_index].unstakeTime >= block.timestamp ) {
+            if ( stakersRecord[msg.sender][index].unstakeTime >= block.timestamp ) {
                 continue;
             }
-            if ( stakersRecord[msg.sender][_index].availableUnstakeAmount > _amount ) {
-                stakersRecord[msg.sender][_index].availableUnstakeAmount = stakersRecord[msg.sender][_index].availableUnstakeAmount - _amount;
+            if ( stakersRecord[msg.sender][index].availableUnstakedAmount > _amount ) {
+                stakersRecord[msg.sender][index].availableUnstakedAmount =
+                    stakersRecord[msg.sender][index].availableUnstakedAmount - _amount;
                 _amount = 0;
             } else {
-                _amount = _amount - stakersRecord[msg.sender][_index].availableUnstakeAmount;
-                stakersRecord[msg.sender][_index].availableUnstakeAmount = 0;
-                stakersRecord[msg.sender][_index].unstaked = true;
+                _amount = _amount - stakersRecord[msg.sender][index].availableUnstakedAmount;
+                stakersRecord[msg.sender][index].availableUnstakedAmount = 0;
+                stakersRecord[msg.sender][index].unstaked = true;
             }
         }
 
         stakeToken.transfer(msg.sender, sendAmount);
 
-        totalUnstakedToken = totalUnstakedToken.add(sendAmount);
-        Stakers[msg.sender].totalUnstakedToken = Stakers[msg.sender].totalUnstakedToken.add(sendAmount);
+        totalUnStakedToken = totalUnStakedToken.add(sendAmount);
+        Stakers[msg.sender].totalUnstakedTokenUser = Stakers[msg.sender]
+            .totalUnstakedTokenUser
+            .add(sendAmount);
     }
 
     function claim( uint256 _amount ) public {
-        require( _amount <= getMaxUnclaimedAmount( msg.sender ), "amount must be less than available max uncliamed amount." );
+        require( _amount <= getMaxUncliamedAmount( msg.sender ), "amount must be less than available max claimed mount" );
 
         uint256 sendReward = _amount;
 
-        for( uint256 _index ; _index < Stakers[msg.sender].stakeCount ; _index++ ) {
-            if ( stakersRecord[msg.sender][_index].withdrawn || _amount == 0) {
+        for( uint256 index ; index < Stakers[msg.sender].stakeCount ; index++ ) {
+            if ( stakersRecord[msg.sender][index].withdrawn || _amount == 0 ) {
                 continue;
             }
-            if ( stakersRecord[msg.sender][_index].unstakeTime >= block.timestamp ) {
+            if ( stakersRecord[msg.sender][index].unstakeTime >= block.timestamp ) {
                 continue;
             }
-            if ( stakersRecord[msg.sender][_index].availableUnClaimedReward > _amount ) {
-                stakersRecord[msg.sender][_index].availableUnClaimedReward = stakersRecord[msg.sender][_index].availableUnClaimedReward - _amount;
+            if ( stakersRecord[msg.sender][index].availableUnclaimedReward > _amount ) {
+                stakersRecord[msg.sender][index].availableUnclaimedReward = 
+                    stakersRecord[msg.sender][index].availableUnclaimedReward - _amount;
                 _amount = 0;
             } else {
-                _amount = _amount - stakersRecord[msg.sender][_index].availableUnClaimedReward;
-                stakersRecord[msg.sender][_index].availableUnClaimedReward = 0;
-                stakersRecord[msg.sender][_index].withdrawn = true;
+                _amount = _amount - stakersRecord[msg.sender][index].availableUnclaimedReward;
+                stakersRecord[msg.sender][index].availableUnclaimedReward = 0;
+                stakersRecord[msg.sender][index].withdrawn = true;
             }
         }
 
         rewardToken.transfer(msg.sender, sendReward);
+        
         totalClaimedRewardToken = totalClaimedRewardToken.add(sendReward);
-        Stakers[msg.sender].totalClaimedRewardToken = Stakers[msg.sender].totalClaimedRewardToken.add(sendReward);
+        Stakers[msg.sender].totalClaimedRewardTokenUser = Stakers[msg.sender]
+            .totalClaimedRewardTokenUser
+            .add(sendReward);
     }
 
-    function getMaxUnstakeableAmount( address _caller ) public view returns ( uint256 ) {
-        uint256 maxUnstakeableAmount;
-        for ( uint256 _index ; _index < Stakers[_caller].stakeCount ; _index++ ) {
-            if ( !stakersRecord[_caller][_index].unstaked && stakersRecord[_caller][_index].unstakeTime < block.timestamp ) {
-                maxUnstakeableAmount = maxUnstakeableAmount.add(stakersRecord[_caller][_index].availableUnstakeAmount);
+    function getMaxUnstakeAmount( address user ) public view returns ( uint256 ) {
+        uint256 maxUnstakeAmount;
+        for ( uint256 index ; index < Stakers[user].stakeCount ; index++ ) {
+            if ( !stakersRecord[user][index].unstaked ) {
+                if ( stakersRecord[user][index].unstakeTime < block.timestamp ) {
+                    maxUnstakeAmount = maxUnstakeAmount
+                        .add( stakersRecord[user][index].availableUnstakedAmount );
+                }
             }
         }
-        return maxUnstakeableAmount;
+        return maxUnstakeAmount;
     }
 
-    function getMaxUnclaimedAmount( address _caller ) public view returns ( uint256 ) {
-        uint256 maxUnclaimedReward;
-        for ( uint256 _index ; _index < Stakers[_caller].stakeCount ; _index++ ) {
-            if ( !stakersRecord[_caller][_index].withdrawn && stakersRecord[_caller][_index].unstakeTime < block.timestamp ) {
-                maxUnclaimedReward = maxUnclaimedReward.add( stakersRecord[_caller][_index].availableUnClaimedReward );
+    function getMaxUncliamedAmount( address user ) public view returns ( uint256 ) {
+        uint256 maxUnClaimedAmount;
+        for( uint256 index ; index < Stakers[user].stakeCount ; index++ ) {
+            if ( !stakersRecord[user][index].withdrawn ) {
+                if( stakersRecord[user][index].unstakeTime < block.timestamp ) {
+                    maxUnClaimedAmount = maxUnClaimedAmount
+                        .add( stakersRecord[user][index].availableUnclaimedReward );
+                }
             }
         }
-        return maxUnclaimedReward;
-    }
-
-    function getReward( uint _amount ) public view returns ( uint256 ) {
-        return _amount.div(percentDivider);
-    }
-
-    function getTimeStamp() public view returns ( uint256 ) {
-        return block.timestamp;
+        return maxUnClaimedAmount;
     }
 
     function getIndexStaker( uint256 _index ) public view returns ( address ) {
@@ -175,7 +189,11 @@ contract TKN_test is Ownable {
     }
 
     function getIndexStakerUnstakedToken( address _index ) public view returns ( uint256 ) {
-        return Stakers[_index].totalUnstakedToken;
+        return Stakers[_index].totalUnstakedTokenUser;
+    }
+
+    function getIndexStakerStakeCount( address _index ) public view returns ( uint256 ) {
+        return Stakers[_index].stakeCount;
     }
 
     function setStakeLimits( uint256 _min, uint256 _max ) external onlyOwner {
@@ -185,9 +203,5 @@ contract TKN_test is Ownable {
 
     function setStakeDuration( uint256 _duration ) external onlyOwner {
         duration = _duration;
-    }
-    
-    function setPercentDivider( uint256 _percentDivider ) external onlyOwner {
-        percentDivider = _percentDivider;
     }
 }
