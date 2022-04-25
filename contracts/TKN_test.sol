@@ -15,6 +15,8 @@ contract TKN_test is Ownable {
 
     // stakeToken address(TKN)
     // 0xaD6D458402F60fD3Bd25163575031ACDce07538D
+    string public name = "TKN_test";
+
     ERC20 public stakeToken;
     ERC20 public rewardToken;
 
