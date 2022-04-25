@@ -17,60 +17,62 @@ contract TKN_test is Ownable {
     // 0xaD6D458402F60fD3Bd25163575031ACDce07538D
     string public name = "TKN_test";
 
-    ERC20 public stakeToken;
+    ERC20 public stakeToken; 
     ERC20 public rewardToken;
 
     uint256 public maxStakeableToken;
     uint256 public minStakeableToken;
-    uint256 public totalUnStakedToken;
-    uint256 public totalStakedToken;
-    uint256 public totalClaimedRewardToken;
-    uint256 public totalStakers;
-    uint256 public percentDivider;
+    uint256 public totalUnStakedToken; // total amount of unstaked token
+    uint256 public totalStakedToken; // total amount of staked token
+    uint256 public totalClaimedRewardToken; // total amount of cliamed token
+    uint256 public totalStakers; // total amount of stakers
+    uint256 public percentDivider; // percent divider : proportion
 
-    uint256 public duration = 20 seconds;
+    uint256 public duration = 20 seconds; // duration : lock time
 
     struct Stake {
-        uint256 unstakeTime;
-        uint256 stakeTime;
-        uint256 amount;
-        uint256 reward;
-        uint256 availableUnstakedAmount;
-        uint256 availableUnclaimedReward;
-        bool withdrawn;
-        bool unstaked;
+        uint256 unstakeTime; // when unstake is available
+        uint256 stakeTime; // when token is staked
+        uint256 amount; // amount of staked token
+        uint256 reward; // amount of reward(total)
+        uint256 availableUnstakedAmount; // amount of unstake available token 
+        uint256 availableUnclaimedReward; // amount of claim available reward
+        bool withdrawn; // status: reward is taken
+        bool unstaked; // status: stakeToken is unstaked
     }
 
     struct User {
-        uint256 totalStakedTokenUser;
-        uint256 totalUnstakedTokenUser;
-        uint256 totalClaimedRewardTokenUser;
-        uint256 stakeCount;
-        bool alreadyExists;
+        uint256 totalStakedTokenUser; // how much token did user stake
+        uint256 totalUnstakedTokenUser; // how much token did user unstake
+        uint256 totalClaimedRewardTokenUser; // how much reward did user claim
+        uint256 stakeCount; // how many times did user stake
+        bool alreadyExists; // is user already exists?
     }
 
-    mapping(address => User) public Stakers;
-    mapping(uint256 => address) public StakersID;
-    mapping(address => mapping(uint256 => Stake)) public stakersRecord;
+    mapping(address => User) public Stakers; // stakers array
+    mapping(uint256 => address) public StakersID; // staker ID array
+    mapping(address => mapping(uint256 => Stake)) public stakersRecord; // record of stakers
 
 
     constructor( address _stakingToken, address _rewardingToken ) {
         stakeToken = ERC20(_stakingToken);
         rewardToken = ERC20(_rewardingToken);
-        maxStakeableToken = stakeToken.totalSupply();
-        minStakeableToken = 1e13;
+        maxStakeableToken = stakeToken.totalSupply(); // set max stakeable token from stkeToken
+        minStakeableToken = 1e13; // set minimum stakeable token
         percentDivider = 1e2;
     }
 
     function stake( uint256 _amount ) public {
         require(_amount >= minStakeableToken, "stake more than minimum amount");
 
+        // insert msg.sender to stakers list
         if ( !Stakers[msg.sender].alreadyExists ) {
             Stakers[msg.sender].alreadyExists = true;
             StakersID[totalStakers] = msg.sender;
             totalStakers ++;
         }
 
+        //transfer stakeToken to smart contract
         stakeToken.transferFrom(msg.sender, address(this), _amount);
 
         uint256 index = Stakers[msg.sender].stakeCount;
@@ -95,6 +97,7 @@ contract TKN_test is Ownable {
         Stakers[msg.sender].stakeCount++;
     }
 
+    // unstake function
     function unstake( uint256 _amount ) public {
         require(
             _amount <= getMaxUnstakeAmount( msg.sender ),
@@ -129,6 +132,7 @@ contract TKN_test is Ownable {
             .add(sendAmount);
     }
 
+    // send reward to msg.sender
     function claim( uint256 _amount ) public {
         require( _amount <= getMaxUncliamedAmount( msg.sender ), "amount must be less than available max claimed mount" );
 
@@ -160,6 +164,7 @@ contract TKN_test is Ownable {
             .add(sendReward);
     }
 
+    // get availabe unstake token amount that user can unstake
     function getMaxUnstakeAmount( address user ) public view returns ( uint256 ) {
         uint256 maxUnstakeAmount;
         for ( uint256 index ; index < Stakers[user].stakeCount ; index++ ) {
@@ -173,6 +178,7 @@ contract TKN_test is Ownable {
         return maxUnstakeAmount;
     }
 
+    // get amount of reward that user can claim
     function getMaxUncliamedAmount( address user ) public view returns ( uint256 ) {
         uint256 maxUnClaimedAmount;
         for( uint256 index ; index < Stakers[user].stakeCount ; index++ ) {
@@ -186,23 +192,28 @@ contract TKN_test is Ownable {
         return maxUnClaimedAmount;
     }
 
+    // get indexed staker
     function getIndexStaker( uint256 _index ) public view returns ( address ) {
         return StakersID[_index];
     }
 
+    // get index staker's unstaked token
     function getIndexStakerUnstakedToken( address _index ) public view returns ( uint256 ) {
         return Stakers[_index].totalUnstakedTokenUser;
     }
 
+    // get index stakers' stake count
     function getIndexStakerStakeCount( address _index ) public view returns ( uint256 ) {
         return Stakers[_index].stakeCount;
     }
 
+    // set min, max stakeable token
     function setStakeLimits( uint256 _min, uint256 _max ) external onlyOwner {
         minStakeableToken = _min;
         maxStakeableToken = _max;
     }
 
+    // set duration
     function setStakeDuration( uint256 _duration ) external onlyOwner {
         duration = _duration;
     }
